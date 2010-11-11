@@ -1,0 +1,98 @@
+#!/usr/bin/env ruby
+
+# Client program for the mcollective package agent found at http://code.google.com/p/mcollective-plugins/
+#
+# Released under the GPLv2
+
+require 'mcollective'
+
+include MCollective::RPC
+
+
+
+options = rpcoptions do |parser, options|
+    options[:timeout] = 180
+
+    parser.define_head "Manage users"
+    parser.banner = "Usage: mc-uam [options] action user <passwd|group>"
+end
+
+#if MCollective::Util.empty_filter?(options[:filter])
+    #print("Do you really want to operate on services unfiltered? (y/n): ")
+    #STDOUT.flush
+
+    #exit unless STDIN.gets.chomp =~ /^y$/
+#end
+
+uam = rpcclient("uam", {:options => options})
+
+def summarize(stats, versions)
+    puts("\n---- uam agent summary ----")
+    puts("           Nodes: #{stats[:discovered]} / #{stats[:responses]}")
+    print("        Versions: ")
+
+    puts versions.keys.sort.map {|s| "#{versions[s]} * #{s}" }.join(", ")
+
+    printf("    Elapsed Time: %.2f s\n\n", stats[:blocktime])
+end
+
+if ARGV.length == 2
+    action = ARGV.shift
+    user = ARGV.shift
+    unless action =~ /^(status|passwd|lock|remove|add)$/
+        puts("Action has to be status, passwd, lock, remove, add or addgroup")
+        exit 1
+    end
+    if action =~ /^(addgroup|passwd)$/
+      puts "When using passwd or addgrouo you must supply a 3rd argument with the password (encrypted) or group"
+      exit 1
+    end
+elsif ARGV.length == 3
+    action = ARGV.shift
+    user = ARGV.shift
+    unless action =~ /^(passwd|addgroup)$/
+        puts("Only the passwd or addgroup option takes a third argument")
+        exit 1
+    end
+    if action == "passwd"
+      passwd = ARGV.shift
+      group = ' '
+    else
+      group = ARGV.shift
+      passwd = ' '
+    end
+else
+    puts("Please specify a user and action")
+    exit 1
+end
+
+
+results = {}
+
+
+stats = uam.send(action, {:user => user, :passwd => passwd, :group => group}) do |resp|
+  
+  next if resp == nil
+  
+  value = resp[:body][:data][:output]
+  
+  results.include?(value) ? results[value] << resp[:senderid] : results[value] = [ resp[:senderid] ]
+  
+end
+
+puts "\rReport for '" + action + " " + user + "'\n" if results.size > 0
+puts "\rSummarized:\n\n" if results.size > 0
+results.keys.sort.each do |k|
+  printf("%-40s: %d occurences\n", k, results[k].size)
+end
+
+if options[:verbose]
+  puts "\nDetailed:\n\n"
+  results.keys.sort.each do |k|
+    results[k].sort.each do |host|
+      printf("%-40s: %s\n", host, k)
+    end
+  end
+end
+
+printrpcstats
