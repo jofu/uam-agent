@@ -26,32 +26,22 @@ end
 
 uam = rpcclient("uam", {:options => options})
 
-def summarize(stats, versions)
-    puts("\n---- uam agent summary ----")
-    puts("           Nodes: #{stats[:discovered]} / #{stats[:responses]}")
-    print("        Versions: ")
-
-    puts versions.keys.sort.map {|s| "#{versions[s]} * #{s}" }.join(", ")
-
-    printf("    Elapsed Time: %.2f s\n\n", stats[:blocktime])
-end
-
 if ARGV.length == 2
     action = ARGV.shift
     user = ARGV.shift
-    unless action =~ /^(status|passwd|lock|remove|add)$/
+    unless action =~ /^(status|passwd|lock|remove|add|addtogroup|removefromgroup)$/
         puts("Action has to be status, passwd, lock, remove, add or addgroup")
         exit 1
     end
-    if action =~ /^(addgroup|passwd)$/
-      puts "When using passwd or addgrouo you must supply a 3rd argument with the password (encrypted) or group"
+    if action =~ /^(addtogroup|passwd|addtogroup|removefromgroup)$/
+      puts "When using passwd, removefromgroup or addtogroup you must supply a 3rd argument with the password (encrypted) or group"
       exit 1
     end
 elsif ARGV.length == 3
     action = ARGV.shift
     user = ARGV.shift
-    unless action =~ /^(passwd|addgroup)$/
-        puts("Only the passwd or addgroup option takes a third argument")
+    unless action =~ /^(passwd|addtogroup|removefromgroup)$/
+        puts("Only the passwd, removefromgroup or addtogroup option takes a third argument")
         exit 1
     end
     if action == "passwd"
