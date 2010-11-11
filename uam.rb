@@ -23,7 +23,7 @@ module MCollective
                 :description  => "Agent To Manage Users",
                 :author       => "Jonathan Furrer",
                 :license      => "GPLv2",
-                :version      => "0.1",
+                :version      => "1.0",
                 :url          => "http://www.jofu.com/os/mcollective/agents",
                 :timeout      => 180
 
@@ -42,15 +42,40 @@ module MCollective
         user.extend(ExtendPuppetUser)
         if user.ensure == :absent
           reply[:output] = "Fail: '" + request[:user] + "' does not exist"
-	else
-        user.password = request[:passwd]
-        if user.getPW == request[:passwd]
-          reply[:output] = "Success: '" + request[:user] + "' password changed"
-          reply[:exitcode] = 0
         else
-          reply[:output] = "Fail: '" + request[:user] + "' password NOT changed"
-          reply[:exitcode] = 1
+          user.password = request[:passwd]
+          if user.getPW == request[:passwd]
+            reply[:output] = "Success: '" + request[:user] + "' password changed"
+          else
+            reply[:output] = "Fail: '" + request[:user] + "' password NOT changed"
+          end
         end
+      end
+      
+      action "addgroup" do
+        validate :user, :shellsafe
+        validate :group, :shellsafe
+        require 'puppet'
+        user = ::Puppet::Type.type(:user).create(:name => request[:user]).provider
+        user.extend(ExtendPuppetUser)
+        group = ::Puppet::Type.type(:group).create(:name => request[:group]).provider
+        if group.ensure == :absent
+          reply[:output] = "Fail: '" + request[:group] + "' group does not exist"
+        else
+          if user.ensure == :absent
+            reply[:output] = "Fail: '" + request[:user] + "' does not exist"
+          else
+            if user.groups.split(/,/).include?(request[:group])
+              reply[:output] = "Fail: '" + request[:user] + "' is already in group '" + request[:group]
+            else
+              user.groups = user.groups + "," + request[:group]
+              if user.groups.split(/,/).include?(request[:group])
+                reply[:output] = "Success: '" + request[:user] + "' has been added to '" + request[:group]
+              else
+                reply[:output] = "Fail: '" + request[:user] + "' has NOT been added to '" + request[:group]
+              end
+            end
+          end
         end
       end
       
@@ -83,7 +108,7 @@ module MCollective
               
             when :remove
               if user.ensure == :absent
-                reply[:output] = "Unknown: '" + request[:user] + "' already didn't exist"
+                reply[:output] = "Success: '" + request[:user] + "' already didn't exist"
               else
                 user.delete
                 if user.ensure == :absent
@@ -95,7 +120,7 @@ module MCollective
               
             when :add
               if user.ensure == :present
-                reply[:output] = "Unknown: '" + request[:user] + "' already exists"
+                reply[:output] = "Success: '" + request[:user] + "' already exists"
               else
                 user.create
                 if user.ensure == :present
