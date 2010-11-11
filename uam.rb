@@ -52,7 +52,7 @@ module MCollective
         end
       end
       
-      action "addgroup" do
+      action "addtogroup" do
         validate :user, :shellsafe
         validate :group, :shellsafe
         require 'puppet'
@@ -66,18 +66,43 @@ module MCollective
             reply[:output] = "Fail: '" + request[:user] + "' does not exist"
           else
             if user.groups.split(/,/).include?(request[:group])
-              reply[:output] = "Fail: '" + request[:user] + "' is already in group '" + request[:group]
+              reply[:output] = "Fail: '" + request[:user] + "' is already in group '" + request[:group] + "'"
             else
               user.groups = user.groups + "," + request[:group]
               if user.groups.split(/,/).include?(request[:group])
-                reply[:output] = "Success: '" + request[:user] + "' has been added to '" + request[:group]
+                reply[:output] = "Success: '" + request[:user] + "' has been added to '" + request[:group] + "'"
               else
-                reply[:output] = "Fail: '" + request[:user] + "' has NOT been added to '" + request[:group]
+                reply[:output] = "Fail: '" + request[:user] + "' has NOT been added to '" + request[:group] + "'"
               end
             end
           end
         end
       end
+      
+      action "removefromgroup" do
+        validate :user, :shellsafe
+        validate :group, :shellsafe
+        require 'puppet'
+        user = ::Puppet::Type.type(:user).create(:name => request[:user]).provider
+        user.extend(ExtendPuppetUser)
+        if user.ensure == :absent
+          reply[:output] = "Fail: '" + request[:user] + "' does not exist"
+        elseif user.groups.split(/,/).include?(request[:group])
+          reply[:output] = "Fail: '" + request[:user] + "' not in group '" + request[:group] +"'"
+        else
+          newgroups = nil
+          user.groups.split(/,/).each do |group|
+            next if group == request[:group]
+            newgroups == nil ? newgroups = group : newgroups = newgroups + ',' + group
+          end
+          user.groups = newgroups
+          reply[:output] = "Success: removed '" + request[:user] + "' from group '" + request[:group] + "'" unless user.groups.split(/,/).include?(request[:group])
+          reply[:output] = "Fail: '" + request[:user] + "' NOT removed from group '" + request[:group] + "'" if user.groups.split(/,/).include?(request[:group])
+        end
+        reply[:output] = "Fail: UNKNOWN ERROR" unless reply[:output]
+      end
+          
+        
       
       private
       def do_user_action(action)
